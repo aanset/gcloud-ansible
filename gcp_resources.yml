@@ -1,0 +1,61 @@
+- name: Create a GCP instance
+  hosts: localhost
+  vars:
+     gcp_project: mdb-gke
+     gcp_cred_kind: serviceaccount
+     gcp_cred_file: /home/andry/Desktop/mdb-gke-d46e028ef661.json
+     region: asia-southeast2
+     zone: asia-southeast2-a
+  tasks:
+    - name: create a disk mapped from RHEL7 image
+      gcp_compute_disk:
+        name: disk-instance
+        size_gb: 20
+        source_image: projects/rhel-cloud/global/images/rhel-7-v20201216
+        zone: "{{ zone }}"
+        project: "{{ gcp_project }}"
+        auth_kind: "{{ gcp_cred_kind }}"
+        service_account_file: "{{ gcp_cred_file }}"
+        state: present
+      register: disk
+
+#    - name: create a  VPC networkdd
+#      gcp_compute_network:
+#        name: network-instance
+#        project: "{{ gcp_project }}"
+#        auth_kind: "{{ gcp_cred_kind }}"
+#        service_account_file: "{{ gcp_cred_file }}"
+#        state: present
+#      register: network
+
+    - name: create an IPv4 public IP Address
+      gcp_compute_address:
+        name: address-instance
+        region: "{{ region }}"
+        project: "{{ gcp_project }}"
+        auth_kind: "{{ gcp_cred_kind }}"
+        service_account_file: "{{ gcp_cred_file }}"
+        state: present
+      register: gcea_ip
+
+    - name: create the RHEL7 instance
+      gcp_compute_instance:
+        name: rhel7
+        machine_type: g1-small
+        disks:
+        - auto_delete: 'true'
+          boot: 'true'
+          source: "{{ disk }}"
+        network_interfaces:
+          - access_configs:
+            - name: External NAT
+              nat_ip: "{{ gcea_ip }}"
+              type: ONE_TO_ONE_NAT
+        zone: "{{ zone }}"
+        project: "{{ gcp_project }}"
+        auth_kind: "{{ gcp_cred_kind }}"
+        service_account_file: "{{ gcp_cred_file }}"
+        state: present
+    - name: Show RHEL7 Instance Details
+      debug:
+        msg: "The RHEL7 instance is accessible at {{ gcea_ip }}"
